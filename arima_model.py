@@ -6,24 +6,24 @@ from statsmodels.tsa.arima.model import ARIMA
 
 
 df = pd.read_csv('PastLaunchData.csv')
-start_time = pd.Timestamp("2022-01-01 00:00:00")
+start_time = pd.Timestamp('2022-01-01 00:00:00')
 
-df['TIME'] = pd.to_numeric(df['TIME'], errors='coerce')
-df['TIME'] = pd.to_timedelta(df['TIME'], unit='s')
-df['TIME'] = start_time + df['TIME']
+df['MILLIS'] = pd.to_numeric(df['MILLIS'], errors='coerce')
+df['MILLIS'] = pd.to_timedelta(df['MILLIS'], unit='ms')
+df['MILLIS'] = start_time + df['MILLIS']
 
-df = df.dropna(subset=['TIME', 'TEMP', 'PRESSURE', 'altitude (meters)'])
-df.set_index('TIME', inplace=True)
+df = df.dropna(subset=['MILLIS', 'TEMP', 'PRESSURE', 'altitude (meters)'])
+df.set_index('MILLIS', inplace=True)
 
 fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True)
 df['TEMP'].plot(ax=axes[0], title='Temperature')
 df['HUMIDITY'].plot(ax=axes[1], title='Humidity')
 df['PRESSURE'].plot(ax=axes[2], title='Pressure')
 df['altitude (meters)'].plot(ax=axes[3], title='Altitude (meters)')
-plt.xlabel('Time')
+plt.xlabel('Time in milliseconds')
 plt.show()
 
-# TODO: Split the data into training, development, and test data using a 1:3:10 ratio. Think about what dimension each of these should be
+# TODO: Split the data into training and test data using a 10:4 ratio.
 total_num_rows = len(df)
 
 train_data = int(total_num_rows * (10/14))
@@ -50,8 +50,6 @@ model_fit = model.fit()
 # # density plot of residuals
 # residuals.plot(kind='kde', title='Residual Density')
 # plt.show()
-# # summary stats of residuals
-# print(residuals.describe())
 
 test_predictions = model_fit.predict(start=len(train), end=len(train) + len(test) - 1, exog=test_exog)
 
@@ -73,7 +71,7 @@ plt.plot(test.index, test_predictions, label='Predicted Temperature (Test Range)
 plt.plot(future_predictions.index, future_predictions, label='Future Predictions', color='purple')
 
 # Adding labels and title
-plt.xlabel('Time')
+plt.xlabel('Time in milliseconds')
 plt.ylabel('Temperature')
 plt.title('Temperature Prediction with Extended Forecast')
 plt.legend()
