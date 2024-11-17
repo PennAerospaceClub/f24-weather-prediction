@@ -24,9 +24,9 @@ We will first clean and scale the data. Here, we will:
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+import time
 
 # Load the data
 file_path = "data\PastLaunchData.csv"
@@ -67,57 +67,3 @@ In this section, we will use our cleaned data to train a Random Forest model.
 # Initialize and train the Random Forest Regressor
 rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_model.fit(X_train_scaled, y_train)
-
-# Make predictions on the test set
-y_pred = rf_model.predict(X_test_scaled)
-
-# Evaluate the model's performance
-mae = mean_absolute_error(y_test, y_pred)
-rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-
-"""After fitting model to our training data and testing the model on our test dataset, we arrive at a MAE of 0.0203 and RMSE of 0.0463, which is considered accurate."""
-
-# Print all feature variable names (excluding the target variable "TEMP")
-feature_columns = X.columns.tolist()
-print("Feature Variables:")
-for feature in feature_columns:
-  print(feature)
-
-"""# Model Visualization"""
-
-import matplotlib.pyplot as plt
-import pandas as pd
-
-# Get feature importances
-feature_importances = pd.Series(rf_model.feature_importances_, index=X.columns)
-
-# Plot feature importances
-plt.figure(figsize=(10, 6))
-feature_importances.sort_values().plot(kind='barh')
-plt.title("Feature Importance in Random Forest Model")
-plt.xlabel("Importance Score")
-plt.show()
-
-# Scatter plot for actual vs predicted values
-plt.figure(figsize=(8, 6))
-plt.scatter(y_test, y_pred, alpha=0.5)
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
-plt.xlabel("Actual Temperature")
-plt.ylabel("Predicted Temperature")
-plt.title("Actual vs Predicted Temperature")
-plt.show()
-
-import seaborn as sns
-
-# Calculate errors
-errors = y_test - y_pred
-
-# Plot error distribution
-plt.figure(figsize=(8, 6))
-sns.histplot(errors, kde=True)
-plt.xlabel("Prediction Error (Actual - Predicted)")
-plt.title("Distribution of Prediction Errors")
-plt.show()
