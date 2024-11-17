@@ -24,16 +24,20 @@ We will first clean and scale the data. Here, we will:
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import time
+import os
+from datetime import datetime
 
 # Load the data
 file_path = "data\PastLaunchData.csv"
 data = pd.read_csv(file_path)
 
 # Drop unnecessary columns (like unnamed or duplicated temperature columns)
-data = data.drop(columns=["Unnamed: 1", "TEMP.1", "EULERX", "EULERY", "EULERZ",
+# TEMP = fahrenheit, TEMP.1 = celcius
+data = data.drop(columns=["Unnamed: 1", "TEMP", "EULERX", "EULERY", "EULERZ",
                           "COURSE", "NUM SATS", "VEL DIFF"], errors='ignore')
 
 # Convert all columns to numeric, coercing errors to NaN
@@ -43,8 +47,8 @@ data = data.apply(pd.to_numeric, errors='coerce')
 data.fillna(data.median(), inplace=True)
 
 # Separate features and target variable
-X = data.drop(columns=["TEMP"], errors='ignore')  # Features (exclude TEMP)
-y = data["TEMP"]  # Target variable (temperature)
+X = data.drop(columns=["TEMP.1"], errors='ignore')  # Features (exclude TEMP)
+y = data["TEMP.1"]  # Target variable (temperature)
 
 # Convert TIME column to numeric, handle any non-numeric entries by coercing them to NaN
 X['TIME'] = pd.to_numeric(X['TIME'], errors='coerce')
@@ -67,3 +71,82 @@ In this section, we will use our cleaned data to train a Random Forest model.
 # Initialize and train the Random Forest Regressor
 rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_model.fit(X_train_scaled, y_train)
+
+"""
+Next section deals with predicting new temperature data every 10 minutes
+"""
+
+print("\n\n\nBeginning weather predictions\n\n\n")
+
+
+# Output file to save results
+output_file = "data/predictions_output.csv"
+if not os.path.exists(output_file):
+    with open(output_file, "w") as f:
+        f.write("Timestamp,Actual_Temperature,Predicted_Temperature,Accuracy\n")
+
+# Store the indices of rows already processed
+processed_indices = set()
+
+# Loop to predict every 10 minutes
+while True:
+    try:
+        # Path to the updated file
+        update_file_path = "data/NewLaunchData.csv"
+        if not os.path.exists(update_file_path):
+            print(f"\nFile not found: {update_file_path}. Retrying in 10 minutes...\n")
+            time.sleep(600)
+            continue
+
+        # Read the updated data
+        updated_data = pd.read_csv(update_file_path)
+        
+        # Drop unnecessary columns and handle missing values
+        updated_data = updated_data.drop(columns=["Unnamed: 1", "TEMP", "EULERX", "EULERY", "EULERZ",
+                                                  "COURSE", "NUM SATS", "VEL DIFF"], errors='ignore')
+        updated_data = updated_data.apply(pd.to_numeric, errors='coerce')
+        updated_data.fillna(updated_data.median(), inplace=True)
+
+        # Identify new rows by their index
+        new_data = updated_data[~updated_data.index.isin(processed_indices)]
+        if new_data.empty:
+            print("\nNo new data to process. Waiting for 10 minutes...\n")
+            time.sleep(600)
+            continue
+
+        # Update the set of processed indices
+        processed_indices.update(new_data.index)
+
+        # Separate features and target variable
+        X_updated = new_data.drop(columns=["TEMP.1"], errors='ignore')  # Features
+        y_actual = new_data["TEMP.1"] if "TEMP.1" in new_data else None  # Actual temperature
+
+        # Convert TIME column if present
+        if 'TIME' in X_updated:
+            X_updated['TIME'] = pd.to_numeric(X_updated['TIME'], errors='coerce')
+            X_updated['TIME'].fillna(X['TIME'].median(), inplace=True)
+
+        # Scale the updated features
+        X_updated_scaled = scaler.transform(X_updated)
+
+        # Predict the temperature
+        y_pred = rf_model.predict(X_updated_scaled)
+
+        # Calculate accuracy if actual temperature is available
+        accuracy = None
+        if y_actual is not None:
+            mse = mean_squared_error(y_actual, y_pred)
+            accuracy = 100 - (np.sqrt(mse) / y_actual.mean() * 100)
+
+        # Save results to the output file
+        with open(output_file, "a") as f:
+            for actual, predicted, time_stamp in zip(y_actual, y_pred, new_data['TIME']):
+                f.write(f"{time_stamp},{actual},{predicted},{accuracy}\n")
+
+        print(f"\nProcessed {len(new_data)} new rows. Predictions saved to {output_file}. Next update in 10 minutes.\n")
+
+    except Exception as e:
+        print(f"\nError during prediction: {e}. Retrying in 10 minutes...\n")
+    
+    # Wait for 10 minutes
+    time.sleep(600)
